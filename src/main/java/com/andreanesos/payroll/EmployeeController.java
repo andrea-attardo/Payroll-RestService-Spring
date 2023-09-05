@@ -1,7 +1,14 @@
 package com.andreanesos.payroll;
 
-import java.util.List;
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo;
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
 
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.springframework.hateoas.CollectionModel;
+import org.springframework.hateoas.EntityModel;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,15 +23,22 @@ import org.springframework.web.bind.annotation.RestController;
 public class EmployeeController {
 
     private EmployeeRepository repository;
+    private EmployeeModelAssembler assembler;
     
-    EmployeeController(EmployeeRepository repository) {
+    EmployeeController(EmployeeRepository repository, EmployeeModelAssembler assembler) {
         this.repository = repository;
+        this.assembler = assembler;
     }
     
     
     @GetMapping
-    List<Employee> findAll(){
-        return repository.findAll();
+    CollectionModel<EntityModel<Employee>> findAll() {
+
+        List<EntityModel<Employee>> employees = repository.findAll().stream() //
+                            .map(assembler::toModel) //
+                            .collect(Collectors.toList());
+
+        return CollectionModel.of(employees, linkTo(methodOn(EmployeeController.class).findAll()).withSelfRel());
     }
     
     @PostMapping
@@ -34,8 +48,33 @@ public class EmployeeController {
     
     //single items
     @GetMapping("/{id}")
-    Employee findById(@PathVariable Long id) throws EmployeeNotFoundException {
-        return repository.findById(id).orElseThrow(() -> new EmployeeNotFoundException(id));
+    EntityModel<Employee> findById(@PathVariable Long id)  {
+
+        Employee employee = null;
+        try {
+            employee = repository.findById(id) //
+                    .orElseThrow(() -> new EmployeeNotFoundException(id));
+        } catch (EmployeeNotFoundException e) {
+        }
+        
+        return assembler.toModel(employee);
+        
+        /*
+        EntityModel<Employee> entityModel= EntityModel.of(null);
+        Optional<Employee> opEmployee = repository.findById(id);
+        try {
+            if (opEmployee.isPresent()) {
+            entityModel = assembler.toModel(opEmployee.get());
+            }else {
+                throw new  EmployeeNotFoundException(id);
+            }
+        }catch(EmployeeNotFoundException e) {
+            
+        }
+        return entityModel;
+        */
+        //        .orElseThrow(() -> new EmployeeNotFoundException(id));
+
     }
     
     @PutMapping("/{id}")
